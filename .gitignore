@@ -24,3 +24,4 @@ dist-ssr
 *.sw?
 /src-tauri/lib/file.jar
 /src-tauri/libs/file.jar
+libs

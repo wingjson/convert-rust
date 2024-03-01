@@ -4,18 +4,12 @@
  * @LastEditTime: 2024-02-23 16:04:09
  * @FilePath: \ConvertTool\src-tauri\src\convert.rs
  */
-/*
- * @Date: 2024-02-04 09:17:54
- * @LastEditors: WWW
- * @LastEditTime: 2024-02-19 15:51:15
- * @FilePath: \ConvertTool\src-tauri\src\convert.rs
- */
 use jni::objects::{JObject, JValue};
 use crate::global::GLOBAL_JVM;
 
 /**
  * @description: convert
- * @param {*} jni
+ * @param {*} source target
  * @return {*}
  */
 pub fn convert(source: String, target: String) -> jni::errors::Result<()> {

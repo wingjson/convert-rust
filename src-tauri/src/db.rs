@@ -2,16 +2,18 @@ extern crate rusqlite;
 use std::sync::MutexGuard;
 use crate::global::GLOBAL_DB;
 use rusqlite::{params, Connection, Result};
+use serde::{Serialize, Deserialize};
 
 pub struct DbInfo{
     status: i32,
     conn: Connection
 }
 
+#[derive(Serialize, Deserialize,Clone)]
 pub struct List{
-    pub id: Option<i32>,
-    pub file: String,
-    pub original_file: String,
+    pub id: Option<i64>,
+    pub source_file: String,
+    pub target_file: String,
     pub status: i32
 }
 
@@ -38,8 +40,8 @@ impl DbInfo{
             let list_iter = stmt.query_map([], |row| {
                 Ok(List {
                     id: row.get(0)?,
-                    file: row.get(1)?,
-                    original_file: row.get(2)?,
+                    source_file: row.get(1)?,
+                    target_file: row.get(2)?,
                     status: row.get(3)?
                 })
             })?;
@@ -64,6 +66,37 @@ impl DbInfo{
         
     }
 
+    /**
+     * @description: init table when enter
+     * @param {*} Result
+     * @return {*}
+     */    
+    pub fn init_table() -> Result<()> {
+        let db_lock = GLOBAL_DB.lock().unwrap();
+        if let Some(ref conn) = *db_lock {
+            let _ = conn.execute(
+                "CREATE TABLE IF NOT EXISTS info (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source_file TEXT NOT NULL,
+                    target_file TEXT NOT NULL,
+                    status INTEGER NOT NULL
+                )",
+                [],
+            );
+    
+            // config table
+            let _ = conn.execute(
+                "CREATE TABLE IF NOT EXISTS config (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    description TEXT,
+                    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+                )",
+                [],
+            );
+        }
+        Ok(())
+    }
 
     /**
      * @description: insert 
@@ -75,8 +108,8 @@ impl DbInfo{
         let db_lock = GLOBAL_DB.lock().unwrap();
         if let Some(ref conn) = *db_lock {
             conn.execute(
-                "INSERT INTO info (file, original_file, status) VALUES (?1, ?2, ?3)",
-                params![info.file, info.original_file, info.status],
+                "INSERT INTO info (source_file, target_file, status) VALUES (?1, ?2, ?3)",
+                params![info.source_file, info.target_file, info.status],
             )?;
             let last_inserted_id = conn.last_insert_rowid();
             Ok(last_inserted_id)
@@ -86,33 +119,6 @@ impl DbInfo{
         
     }
 
-
-    pub fn init_table() -> Result<()> {
-        let db_lock = GLOBAL_DB.lock().unwrap();
-        if let Some(ref conn) = *db_lock {
-            conn.execute(
-                "CREATE TABLE IF NOT EXISTS info (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    file TEXT NOT NULL,
-                    original_file TEXT NOT NULL,
-                    status INTEGER NOT NULL
-                )",
-                [],
-            )?;
-    
-            // config table
-            conn.execute(
-                "CREATE TABLE IF NOT EXISTS config (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL,
-                    description TEXT,
-                    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
-                )",
-                [],
-            )?;
-        }
-        Ok(())
-    }
 
     pub fn insert_config(info: Config) -> Result<i64> {
         let db_lock = GLOBAL_DB.lock().unwrap();
@@ -140,8 +146,8 @@ mod tests {
         // 创建要插入的 List
         let test_info = List {
             id: None,
-            file: "test".to_string(),
-            original_file: "test".to_string(),
+            source_file: "test".to_string(),
+            target_file: "test".to_string(),
             status: 0,
         };
 
