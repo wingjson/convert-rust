@@ -74,6 +74,8 @@ impl DbInfo{
     pub fn init_table() -> Result<()> {
         let db_lock = GLOBAL_DB.lock().unwrap();
         if let Some(ref conn) = *db_lock {
+            //first drop table
+            let _ = conn.execute("DROP TABLE IF EXISTS info", []);
             let _ = conn.execute(
                 "CREATE TABLE IF NOT EXISTS info (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,

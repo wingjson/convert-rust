@@ -1,14 +1,8 @@
 /*
  * @Date: 2024-02-23 16:20:28
  * @LastEditors: WWW
- * @LastEditTime: 2024-03-01 16:06:56
- * @FilePath: \convertRust\src-tauri\src\main.rs
- */
-/*
- * @Date: 2024-02-01 08:55:36
- * @LastEditors: WWW
- * @LastEditTime: 2024-03-01 09:51:10
- * @FilePath: \convertRust\src-tauri\src\main.rs
+ * @LastEditTime: 2024-03-01 20:36:09
+ * @FilePath: \convert-rust\src-tauri\src\main.rs
  */
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -20,17 +14,15 @@ mod jvm;
 mod utilts;
 mod command;
 mod task;
-mod test;
 
 use std::env;
-use std::sync::Arc;
-use global::{GLOBAL_CACHE, GLOBAL_DB, GLOBAL_JVM, GLOBAL_QUEUE};
+use global::{GLOBAL_CACHE, GLOBAL_DB, GLOBAL_JVM};
 use jni::JNIVersion;
 use jni::JavaVM;
 use db::DbInfo;
+use task::monitor_tasks;
 use rusqlite::Connection;
-use command::{convert};
-use tokio::sync::{mpsc, Semaphore};
+use command::convert;
 
 fn main() {
     // create runtime
@@ -54,6 +46,7 @@ fn main() {
                     match DbInfo::init_table() {
                         Ok(_) => {
                             println!("Database initialized successfully.");
+                            let _ = monitor_tasks().await;
                         }
                         Err(e) => {
                             eprintln!("Failed to initialize database: {}", e);
@@ -62,37 +55,29 @@ fn main() {
                 });
                 
 
-                //####################################start queue ###########################################
-                let queue_path = db_dir.join("queue");
-                tauri::async_runtime::spawn(async move {
-                    let queue = sled::open(queue_path).expect("failed to open sled db");
-                    // 假设 GLOBAL_QUEUE 是一个全局的 Mutex<Option<sled::Db>>
-                    let mut queue_lock = GLOBAL_QUEUE.lock().unwrap();
-                    *queue_lock = Some(queue.clone());
-                    let semaphore = Arc::new(Semaphore::new(3)); // 最多三个并发任务
-                    let (tx, rx) = mpsc::channel(32);
-                    // 这里假设 watch_prefix_and_send_events 和 task_processor 是适配异步的
-                    task::watch_prefix_and_send_events(tx);
-                    tokio::spawn(task::task_processor(rx, semaphore));
-                });
-
                 //#################################### jvm dir ###########################################
-                // let mut java_dir = lib_path.join("libs/jre/bin").to_string_lossy().to_string();
-                // // need remove \\\\?\\
-                // if java_dir.starts_with("\\\\?\\") {
-                //     java_dir = java_dir.trim_start_matches("\\\\?\\").to_string();
-                // }
-                // env::set_var("JAVA_HOME", &java_dir);
-                // let jar_path = db_dir.join("file.jar").to_string_lossy().to_string();
-                // let class_path_option = format!("-Djava.class.path={}", jar_path);
-                // let jvm_args = jni::InitArgsBuilder::new()
-                //     .version(JNIVersion::V8)
-                //     .option(&class_path_option)
-                //     .build().unwrap();
+                let mut java_dir = lib_path.join("libs/env/bin").to_string_lossy().to_string();
+                // need remove \\\\?\\
+                if java_dir.starts_with("\\\\?\\") {
+                    java_dir = java_dir.trim_start_matches("\\\\?\\").to_string();
+                }
+                print!("java dir: {}", java_dir);
+                env::set_var("JAVA_HOME", &java_dir);
+                let mut jar_path = db_dir.join("file.jar").to_string_lossy().to_string();
+                // need remove \\\\?\\
+                if jar_path.starts_with("\\\\?\\") {
+                    jar_path = jar_path.trim_start_matches("\\\\?\\").to_string();
+                }
+                print!("jar path: {}", jar_path);
+                let class_path_option = format!("-Djava.class.path={}", jar_path);
+                let jvm_args = jni::InitArgsBuilder::new()
+                    .version(JNIVersion::V8)
+                    .option(&class_path_option)
+                    .build().unwrap();
 
-                // let jvm = JavaVM::new(jvm_args).unwrap();
-                // let mut jvm_lock = GLOBAL_JVM.lock().unwrap();
-                // *jvm_lock = Some(jvm);
+                let jvm = JavaVM::new(jvm_args).unwrap();
+                let mut jvm_lock = GLOBAL_JVM.lock().unwrap();
+                *jvm_lock = Some(jvm);
             
             }
 
