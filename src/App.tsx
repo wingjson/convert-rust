@@ -9,7 +9,7 @@ function App() {
 
   async function greet() {
     // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-    // setGreetMsg(await invoke("convert", { name, target_type: 3 }));
+    setGreetMsg(await invoke("convert", { name, target_type: 3 }));
     const result = await invoke("convert", { source:name, targetType: 3 });
     console.log(result);
   }
